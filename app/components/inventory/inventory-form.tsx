@@ -32,7 +32,7 @@ const productIdentifiers: Record<
   "5g": { label: "5G modem serial number", placeholder: "Enter serial number" },
   dpc: { label: "DPC device IMEI number", placeholder: "Enter 15-digit IMEI" },
   accessory: {
-    label: "Accessories product code",
+    label: "Accessories",
     placeholder: "Enter product code",
   },
 };
@@ -95,7 +95,7 @@ export default function InventoryForm() {
                 <option value="nbn">NBN with serial number</option>
                 <option value="5g">5G Modem with serial number</option>
                 <option value="dpc">DPC Device with IMEI number</option>
-                <option value="accessory">Telstra Plus Accessory</option>
+                <option value="accessory">Accessories</option>
               </select>
             </label>
             <label className="field col-4">
