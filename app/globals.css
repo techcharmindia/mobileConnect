@@ -185,6 +185,68 @@ h1 {
     font-weight: 700;
 }
 
+.submitted-data {
+    margin-top: 28px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 35px rgba(27, 53, 82, .06);
+}
+
+.table-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.table-heading h2 {
+    margin: 0 0 4px;
+    font-size: 17px;
+}
+
+.table-heading p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.table-scroll table {
+    width: 100%;
+    min-width: 850px;
+    border-collapse: collapse;
+    color: #334e68;
+    font-size: 13px;
+}
+
+.table-scroll th,
+.table-scroll td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.table-scroll th {
+    background: #f7f9fc;
+    color: var(--navy);
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.table-scroll tbody tr:last-child td {
+    border-bottom: 0;
+}
+
 .form-section {
     padding: 30px 38px;
     border-bottom: 1px solid var(--line);
@@ -394,6 +456,15 @@ h1 {
 
     .form-message {
         flex-basis: 100%;
+    }
+
+    .submitted-data {
+        padding: 18px;
+    }
+
+    .table-heading {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .required-key {
