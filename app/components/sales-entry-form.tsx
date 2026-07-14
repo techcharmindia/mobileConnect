@@ -1,16 +1,25 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, useState } from "react";
 
 const today = new Date().toISOString().slice(0, 10);
-// const [notes, setNotes] = useState("");
-// const [category, setCategory] = useState("");
+type SalesRecord = {
+  saleDate: string; channel: string; customerName: string; cac: string; contactNumber: string; email: string;
+  category: string; storeLocation: string; staff: string; notes: string; status: string;
+};
+const salesColumns: { key: keyof SalesRecord; label: string }[] = [
+  { key: "saleDate", label: "Date" }, { key: "channel", label: "Channel" }, { key: "customerName", label: "Customer" },
+  { key: "cac", label: "CAC" }, { key: "contactNumber", label: "Contact" }, { key: "email", label: "Email" },
+  { key: "category", label: "Category" }, { key: "storeLocation", label: "Store" }, { key: "staff", label: "Staff" },
+  { key: "notes", label: "Notes" }, { key: "status", label: "Status" },
+];
 
 export default function SalesEntryForm() {
   const [notes, setNotes] = useState("");
   const [category, setCategory] = useState("");
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState("ppn");
+  const [sales, setSales] = useState<SalesRecord[]>([]);
   const [formData, setFormData] = useState({
     saleDate: today,
     channel: "",
@@ -42,20 +51,18 @@ export default function SalesEntryForm() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
+    const newSale: SalesRecord = { ...formData, category, notes };
+
     const response = await fetch("/api/sales-entry", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        ...formData,
-        category,
-        notes,
-      }),
+      body: JSON.stringify(newSale),
     });
 
     if (response.ok) {
-      alert("Sales Entry Saved Successfully");
+      setSales((entries) => [...entries, newSale]);
 
       setFormData({
         saleDate: today,
@@ -74,6 +81,17 @@ export default function SalesEntryForm() {
     } else {
       alert("Something went wrong");
     }
+  }
+
+  function downloadSalesCsv() {
+    const csv = [salesColumns.map((column) => column.label), ...sales.map((sale) => salesColumns.map((column) => sale[column.key]))]
+      .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    link.download = "sales-entries.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   return (
@@ -302,6 +320,23 @@ export default function SalesEntryForm() {
           </button>
         </div>
       </form>
+      {sales.length > 0 && (
+        <section className="submitted-data">
+          <div className="table-heading">
+            <div>
+              <h2>Submitted sales</h2>
+              <p>{sales.length} saved {sales.length === 1 ? "entry" : "entries"}</p>
+            </div>
+            <button className="button button-secondary" type="button" onClick={downloadSalesCsv}>Download CSV</button>
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead><tr>{salesColumns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
+              <tbody>{sales.map((sale, index) => <tr key={`${sale.customerName}-${index}`}>{salesColumns.map((column) => <td key={column.key}>{sale[column.key] || "—"}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </>
   );
 }
