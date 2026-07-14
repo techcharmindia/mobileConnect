@@ -19,7 +19,7 @@ export default function WorkspaceNavigation({ activeView, onViewChange, store, o
       <div className="workspace-menu-inner">
         <div className="store-menu" onMouseEnter={() => setIsStoreMenuOpen(true)} onMouseLeave={() => setIsStoreMenuOpen(false)}>
           <button className="menu-link" type="button" aria-expanded={isStoreMenuOpen}>
-            {store}<span aria-hidden="true"></span>
+            {store}<span aria-hidden="true">⌄</span>
           </button>
           {isStoreMenuOpen && (
             <div className="store-options">
