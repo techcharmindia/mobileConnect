@@ -194,7 +194,24 @@ export default function SalesEntryForm() {
                 aria-expanded={isCategoryMenuOpen}
               >
                 {category ? category.toUpperCase() : "Select category"}
-                <span>⌄</span>
+                <span className="arrow">
+                  <svg
+                    className="arrow-svg"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M6 9L12 15L18 9"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
               </button>
               {isCategoryMenuOpen && (
                 <div
@@ -249,14 +266,14 @@ export default function SalesEntryForm() {
             <label className="field col-4">
               <span>Store location</span>
               <select
-  name="storeLocation"
-  value={formData.storeLocation}
-  onChange={handleChange}
->
-  <option value="">Select store location</option>
-  <option value="Underwood">Underwood</option>
-  <option value="Sunnybank Hills">Sunnybank Hills</option>
-</select>
+                name="storeLocation"
+                value={formData.storeLocation}
+                onChange={handleChange}
+              >
+                <option value="">Select store location</option>
+                <option value="Underwood">Underwood</option>
+                <option value="Sunnybank Hills">Sunnybank Hills</option>
+              </select>
             </label>
             <label className="field col-4">
               <span>Staff</span>
@@ -287,17 +304,17 @@ export default function SalesEntryForm() {
                 Status <b>*</b>
               </span>
               <select
-  name="status"
-  value={formData.status}
-  onChange={handleChange}
-  required
->
-  <option value="Submitted">Submitted</option>
-  <option value="In Progress">In Progress</option>
-  <option value="Activated">Activated</option>
-  <option value="Cancelled">Cancelled</option>
-  <option value="Paid">Paid</option>
-</select>
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                required
+              >
+                <option value="Submitted">Submitted</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Activated">Activated</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Paid">Paid</option>
+              </select>
               <small className="status-help">
                 Choose the current sales stage.
               </small>
@@ -325,14 +342,36 @@ export default function SalesEntryForm() {
           <div className="table-heading">
             <div>
               <h2>Submitted sales</h2>
-              <p>{sales.length} saved {sales.length === 1 ? "entry" : "entries"}</p>
+              <p>
+                {sales.length} saved {sales.length === 1 ? "entry" : "entries"}
+              </p>
             </div>
-            <button className="button button-secondary" type="button" onClick={downloadSalesCsv}>Download CSV</button>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={downloadSalesCsv}
+            >
+              Download CSV
+            </button>
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr>{salesColumns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
-              <tbody>{sales.map((sale, index) => <tr key={`${sale.customerName}-${index}`}>{salesColumns.map((column) => <td key={column.key}>{sale[column.key] || "—"}</td>)}</tr>)}</tbody>
+              <thead>
+                <tr>
+                  {salesColumns.map((column) => (
+                    <th key={column.key}>{column.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((sale, index) => (
+                  <tr key={`${sale.customerName}-${index}`}>
+                    {salesColumns.map((column) => (
+                      <td key={column.key}>{sale[column.key] || "—"}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </section>
