@@ -19,6 +19,9 @@ export async function POST(req: Request) {
       status,
       orderNumber,
       gp,
+      marketingConsent,
+      stockItemUsed,
+      quantity,
     } = body;
 
     const query = `
@@ -35,9 +38,12 @@ export async function POST(req: Request) {
         notes,
         status,
         order_number,
-        gp
+        gp,
+        marketing_consent,
+        stock_item_used,
+        quantity
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
       RETURNING *;
     `;
 
@@ -55,6 +61,9 @@ export async function POST(req: Request) {
       status,
       orderNumber || null,
       Number(gp) || 0,
+      marketingConsent || "Opted In",
+      stockItemUsed || null,
+      Number(quantity) || 1,
     ];
 
     let result;
@@ -64,13 +73,24 @@ export async function POST(req: Request) {
       // Existing installations may have the original table before the new
       // Telstra migration. Keep their POS sales flow working until schema.sql
       // has been run, while upgraded databases retain GP and order details.
-      if (!(error instanceof Error) || !error.message.includes("order_number"))
+      if (!(error instanceof Error) || !/(order_number|marketing_consent|stock_item_used|quantity)/.test(error.message))
         throw error;
-      result = await pool.query(
-        `INSERT INTO sales_entry (sale_date, channel, customer_name, cac, contact_number, email, category, store_location, staff, notes, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-        values.slice(0, 11),
-      );
+      try {
+        // Databases that already have GP/order columns but not the newer
+        // consent and stock columns must still retain the sale's GP value.
+        result = await pool.query(
+          `INSERT INTO sales_entry (sale_date, channel, customer_name, cac, contact_number, email, category, store_location, staff, notes, status, order_number, gp)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+          values.slice(0, 13),
+        );
+      } catch (legacyError: unknown) {
+        if (!(legacyError instanceof Error) || !/(order_number|gp)/.test(legacyError.message)) throw legacyError;
+        result = await pool.query(
+          `INSERT INTO sales_entry (sale_date, channel, customer_name, cac, contact_number, email, category, store_location, staff, notes, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+          values.slice(0, 11),
+        );
+      }
     }
 
     return NextResponse.json(result.rows[0]);
