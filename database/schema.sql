@@ -32,8 +32,15 @@ CREATE TABLE IF NOT EXISTS sales_entry (
   status VARCHAR(40) NOT NULL DEFAULT 'Submitted',
   order_number VARCHAR(80),
   gp NUMERIC(12,2) NOT NULL DEFAULT 0,
+  marketing_consent VARCHAR(20) NOT NULL DEFAULT 'Opted In',
+  stock_item_used VARCHAR(160),
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE sales_entry ADD COLUMN IF NOT EXISTS marketing_consent VARCHAR(20) NOT NULL DEFAULT 'Opted In';
+ALTER TABLE sales_entry ADD COLUMN IF NOT EXISTS stock_item_used VARCHAR(160);
+ALTER TABLE sales_entry ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1;
 
 CREATE TABLE IF NOT EXISTS inventory_items (
   id SERIAL PRIMARY KEY,
