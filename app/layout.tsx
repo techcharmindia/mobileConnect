@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sales Entry | Telstra Sales Portal",
-  description: "Create and manage new sales entries.",
+  title: "MobileConnectOS | Retail workspace",
+  description: "Sales, inventory and team operations in one workspace.",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
