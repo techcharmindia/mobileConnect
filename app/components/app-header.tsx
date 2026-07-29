@@ -7,7 +7,7 @@ export default function AppHeader() {
   const router = useRouter();
   function logout() {
     sessionStorage.removeItem("mobileconnect-user");
-    router.push("/login");
+    router.push("/dashboard");
   }
   return (
     <header className="topbar">
