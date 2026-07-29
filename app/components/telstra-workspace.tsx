@@ -1,8 +1,6 @@
 "use client";
-
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-
+import RosterPanel from "./roster-panel";
 type User = {
   id: number;
   name: string;
@@ -10,7 +8,7 @@ type User = {
   store: string;
 };
 type Sale = {
-  id?: number;
+  id: number;
   sale_date: string;
   channel: string;
   customer_name: string;
@@ -23,642 +21,557 @@ type Sale = {
   notes?: string;
   status: string;
   gp?: number;
+  order_number?: string;
+  stock_item_used?: string;
 };
-type Tab =
-  | "today"
-  | "my-sales"
-  | "customers"
-  | "leaderboard"
-  | "orders"
-  | "stock"
-  | "roster"
-  | "commission"
-  | "performance"
-  | "close";
-const demoUser: User = {
+type Stock = {
+  id: number;
+  name: string;
+  sku: string;
+  store: string;
+  quantity: number;
+  low_stock_threshold: number;
+};
+const fallback: User = {
   id: 0,
   name: "Vanshika",
   role: "sales",
-  store: "Underwood",
+  store: "Sunnybank Hills",
 };
-const roleLabels = {
-  sales: "Sales Team",
-  follow_up: "Follow Up Team",
-  commission: "Commission Team",
-  admin: "Admin",
+const today = () => {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 };
-const seedStock = [
-  { name: "5G Modem", sku: "5GM-100", quantity: 4, threshold: 5 },
-  { name: "NBN Modem", sku: "NBN-201", quantity: 18, threshold: 5 },
-  { name: "SIM Card Pack", sku: "SIM-001", quantity: 32, threshold: 10 },
-];
-
-function SaleTable({
-  sales,
-  canUpdate,
-  onStatus,
-}: {
-  sales: Sale[];
-  canUpdate?: boolean;
-  onStatus?: (sale: Sale, status: string) => void;
-}) {
-  return (
-    <div className="telstra-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Customer</th>
-            <th>Plan / category</th>
-            <th>Rep</th>
-            <th>Store</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sales.map((sale, index) => (
-            <tr key={sale.id ?? `${sale.customer_name}-${index}`}>
-              <td>{sale.sale_date}</td>
-              <td>
-                <b>{sale.customer_name}</b>
-                <small>{sale.contact_number}</small>
-              </td>
-              <td>
-                <span className="plan-pill">{sale.category}</span>
-              </td>
-              <td>{sale.staff || "—"}</td>
-              <td>{sale.store_location || "—"}</td>
-              <td>
-                {canUpdate ? (
-                  <select
-                    className="order-status"
-                    value={sale.status}
-                    onChange={(event) => onStatus?.(sale, event.target.value)}
-                  >
-                    <option>Submitted</option>
-                    <option>In Progress</option>
-                    <option>Activated</option>
-                    <option>Paid</option>
-                  </select>
-                ) : (
-                  <span
-                    className={`order-pill ${sale.status.toLowerCase().replaceAll(" ", "-")}`}
-                  >
-                    {sale.status}
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {sales.length === 0 && (
-        <p className="telstra-empty">No records to show yet.</p>
-      )}
-    </div>
-  );
-}
-
+const money = (n: number) =>
+  `$${Number(n || 0).toLocaleString("en-AU", { maximumFractionDigits: 0 })}`;
+const initials = (n: string) =>
+  n
+    .split(" ")
+    .map((x) => x[0])
+    .join("")
+    .slice(0, 2);
 export default function TelstraWorkspace() {
-  const [user] = useState<User>(() => {
-    if (typeof window === "undefined") return demoUser;
-    const stored = sessionStorage.getItem("telstra-user");
-    return stored ? JSON.parse(stored) : demoUser;
-  });
-  const [tab, setTab] = useState<Tab>("today");
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [stock, setStock] = useState(seedStock);
-  const [notice, setNotice] = useState("");
-  useEffect(() => {
-    fetch("/api/telstra/sales")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.sales) setSales(data.sales);
-      })
-      .catch(() => undefined);
-  }, []);
-  const mySales = useMemo(
-    () => sales.filter((sale) => sale.staff === user.name),
-    [sales, user.name],
+  const [user] = useState<User>(() =>
+    typeof window === "undefined"
+      ? fallback
+      : JSON.parse(
+          sessionStorage.getItem("telstra-user") || JSON.stringify(fallback),
+        ),
   );
-  const leaderboard = useMemo(
+  const [tab, setTab] = useState("today");
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [stock, setStock] = useState<Stock[]>([]);
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+  async function load() {
+    const [s, i] = await Promise.allSettled([
+      fetch("/api/telstra/sales").then((r) =>
+        r.ok ? r.json() : Promise.reject(),
+      ),
+      fetch("/api/telstra/stock").then((r) =>
+        r.ok ? r.json() : Promise.reject(),
+      ),
+    ]);
+    if (s.status === "fulfilled") setSales(s.value.sales || []);
+    if (i.status === "fulfilled") setStock(i.value.stock || []);
+    if (s.status === "rejected" || i.status === "rejected")
+      setNotice(
+        "Some live data could not load. Check the database connection.",
+      );
+    setLoading(false);
+  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const todays = sales.filter((s) => s.sale_date === today());
+  const mine = sales.filter((s) => s.staff === user.name);
+  const gp = todays
+    .filter((s) => s.staff === user.name)
+    .reduce((a, s) => a + Number(s.gp || 0), 0);
+  const ranking = useMemo(
     () =>
       Object.entries(
-        sales.reduce<Record<string, number>>((all, sale) => {
-          const person = sale.staff || "Unassigned";
-          all[person] = (all[person] || 0) + Number(sale.gp || 0);
-          return all;
-        }, {}),
+        sales
+          .filter((s) => s.sale_date.slice(0, 7) === today().slice(0, 7))
+          .reduce<Record<string, number>>((a, s) => {
+            a[s.staff || "Unassigned"] =
+              (a[s.staff || "Unassigned"] || 0) + Number(s.gp || 0);
+            return a;
+          }, {}),
       ).sort((a, b) => b[1] - a[1]),
     [sales],
   );
-  const canManage = user.role === "admin" || user.role === "commission";
-  const canOrders = canManage || user.role === "follow_up";
-  async function changeStatus(sale: Sale, status: string) {
-    if (!sale.id) return;
-    const response = await fetch("/api/telstra/sales", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: sale.id, status }),
-    });
-    if (response.ok)
-      setSales((entries) =>
-        entries.map((item) =>
-          item.id === sale.id ? { ...item, status } : item,
-        ),
-      );
-    else setNotice("Order update could not be saved.");
-  }
-  async function addSale(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const sale: Sale = {
-      sale_date: String(form.get("saleDate")),
-      channel: String(form.get("channel")),
-      customer_name: String(form.get("customerName")),
-      cac: String(form.get("cac")),
-      contact_number: String(form.get("contact")),
-      email: String(form.get("email")),
-      category: String(form.get("category")),
-      store_location: user.store,
+  const low = stock.filter((s) => s.quantity <= s.low_stock_threshold);
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    const body = {
+      saleDate: f.get("saleDate"),
+      channel: f.get("channel"),
+      customerName: f.get("customerName"),
+      orderNumber: f.get("orderNumber"),
+      cac: f.get("cac"),
+      contactNumber: f.get("contact"),
+      email: f.get("email"),
+      category: f.get("category"),
+      storeLocation: user.store,
       staff: user.name,
-      notes: String(form.get("notes")),
-      status: "Submitted",
-      gp: Number(form.get("gp") || 0),
+      notes: f.get("notes"),
+      status: "Pending",
+      gp: Number(f.get("gp")),
+      marketingConsent: f.get("marketingConsent"),
+      stockItemUsed: f.get("stockItemUsed"),
+      quantity: Number(f.get("quantity")),
     };
-    const response = await fetch("/api/sales-entry", {
+    const r = await fetch("/api/sales-entry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sale),
+      body: JSON.stringify(body),
     });
-    if (response.ok) {
-      const saved = await response.json();
-      setSales((entries) => [{ ...sale, ...saved }, ...entries]);
-      event.currentTarget.reset();
-      setNotice("Sale saved and added to the customer audit.");
-    } else
-      setNotice(
-        "Sale could not be saved. Check the PostgreSQL sales_entry table.",
-      );
+    if (!r.ok) {
+      setNotice("Sale could not be saved.");
+      return;
+    }
+    const saved = await r.json();
+    setSales((a) => [saved, ...a]);
+    form.reset();
+    setNotice("Sale saved — Today, My sales and the live leaderboard updated.");
   }
-  function addStock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    setStock((items) => [
-      ...items,
-      {
-        name: String(values.get("item")),
-        sku: String(values.get("sku")),
-        quantity: Number(values.get("quantity")),
-        threshold: Number(values.get("threshold")),
-      },
-    ]);
-    event.currentTarget.reset();
-    setNotice(
-      "Stock item added to this demo workspace. Connect inventory_items API to persist it.",
-    );
+  async function saveStock(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    const r = await fetch("/api/telstra/stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: f.get("name"),
+        sku: f.get("sku"),
+        quantity: Number(f.get("quantity")),
+        lowStockThreshold: Number(f.get("threshold")),
+        store: user.store,
+      }),
+    });
+    if (!r.ok) {
+      setNotice("Stock item could not be saved.");
+      return;
+    }
+    const x = await r.json();
+    setStock((a) => [x.stock, ...a.filter((i) => i.sku !== x.stock.sku)]);
+    form.reset();
+    setNotice("Stock saved to database.");
   }
-  function logout() {
-    sessionStorage.removeItem("telstra-user");
-    location.href = "/dashboard";
-  }
-  const nav: { key: Tab; label: string; allowed?: boolean }[] = [
-    { key: "today", label: "Today" },
-    { key: "my-sales", label: "My sales" },
-    { key: "customers", label: "All customers · audit", allowed: canOrders },
-    { key: "leaderboard", label: "Leaderboard" },
-    { key: "orders", label: "Orders & activations", allowed: canOrders },
-    { key: "stock", label: "Stock" },
-    { key: "roster", label: "Roster", allowed: canManage },
-    { key: "commission", label: "Commission", allowed: canManage },
-    {
-      key: "performance",
-      label: "Staff performance",
-      allowed: user.role === "admin",
-    },
-    { key: "close", label: "Close day", allowed: canManage },
-  ];
   return (
-    <main className="telstra-page">
-      <header className="telstra-topbar">
-        <Link href="/dashboard" className="brand">
-          <span className="brand-mark">M</span>
-          <span>
-            Mobile Connect <small>Telstra CRM</small>
-          </span>
-        </Link>
+    <main className="today-page">
+      <header className="today-brand">
+        <span className="today-logo">
+          <i />
+          <i />
+          <i />
+        </span>
         <div>
-          <span className="telstra-user">
-            {user.name} · {roleLabels[user.role]}
-          </span>
-          <button className="text-button" onClick={logout}>
-            Log out
-          </button>
+          <b>Mobile Connect OS</b>
+          <small>
+            One operating system — sales, roster, stock, commission & reporting
+          </small>
         </div>
       </header>
-      <div className="telstra-layout">
-        <aside className="telstra-sidebar">
+      <div className="today-layout">
+        <aside className="today-sidebar">
           <p>Sales floor</p>
-          {nav
-            .filter((item) => item.allowed !== false)
-            .map((item) => (
-              <button
-                className={tab === item.key ? "active" : ""}
-                key={item.key}
-                onClick={() => setTab(item.key)}
-              >
-                {item.label}
-              </button>
-            ))}
-          <div className="sidebar-user">
+          {[
+            ["today", "Today"],
+            ["my", "My Sales"],
+            ["leader", "Leaderboard"],
+          ].map(([k, l]) => (
+            <button
+              key={k}
+              className={tab === k ? "active" : ""}
+              onClick={() => setTab(k)}
+            >
+              {l}
+            </button>
+          ))}
+          <p className="operation-label">Operations</p>
+          <button
+            className={tab === "stock" ? "active" : ""}
+            onClick={() => setTab("stock")}
+          >
+            Stock {low.length > 0 && <em />}
+          </button>
+          <button onClick={() => setTab("roster")}>Roster</button>
+          <div className="today-account">
+            <p>Logged in</p>
             <b>{user.name}</b>
-            <span>{user.store}</span>
-            <em>{roleLabels[user.role]}</em>
+            <span>Sales Team</span>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem("telstra-user");
+                location.href = "/dashboard";
+              }}
+            >
+              Log Out
+            </button>
           </div>
         </aside>
-        <section className="telstra-main">
+        <section className="today-content">
           {notice && (
-            <div className="telstra-notice">
+            <div className="today-notice">
               {notice}
               <button onClick={() => setNotice("")}>×</button>
             </div>
           )}
-          <Kpis sales={sales} user={user} stock={stock} />
-          {tab === "today" && <Today sales={sales} onSubmit={addSale} />}
-          {tab === "my-sales" && (
+          <Cards gp={gp} low={low.length} />
+          {tab === "today" && (
+            <>
+              <Board data={ranking} user={user} />
+              <div className="today-workspace">
+                <Form user={user} submit={submit} />
+                <section className="sales-card">
+                  <h1>Today’s sales</h1>
+                  <p>Live sales across all staff today</p>
+                  <Table sales={todays} loading={loading} />
+                </section>
+              </div>
+            </>
+          )}
+          {tab === "my" && (
             <Panel
               title="My sales"
-              description="Only sales logged under your staff profile."
+              text="Only sales saved under your staff profile."
             >
-              <SaleTable sales={mySales} />
+              <Table sales={mine} loading={loading} />
             </Panel>
           )}
-          {tab === "customers" && (
-            <Panel
-              title="All customer records"
-              description="Audit view for follow-up and administration teams."
-            >
-              <SaleTable
-                sales={sales}
-                canUpdate={canOrders}
-                onStatus={changeStatus}
-              />
-            </Panel>
-          )}
-          {tab === "leaderboard" && (
-            <Leaderboard data={leaderboard} user={user} />
-          )}
-          {tab === "orders" && (
-            <Panel
-              title="Orders & activations"
-              description="Move submitted sales through the activation workflow."
-            >
-              <SaleTable sales={sales} canUpdate onStatus={changeStatus} />
-            </Panel>
-          )}
+          {tab === "leader" && <Board data={ranking} user={user} full />}
           {tab === "stock" && (
-            <Stock stock={stock} canManage={canManage} onSubmit={addStock} />
+            <>
+              <Panel
+                title="Stock"
+                text={`${low.length} items need restocking — live inventory database.`}
+              >
+                <div className="stock-grid">
+                  {stock.map((i) => (
+                    <article key={i.id}>
+                      <b>{i.name}</b>
+                      <small>
+                        {i.sku} · {i.store}
+                      </small>
+                      <strong>{i.quantity} units</strong>
+                      <span
+                        className={
+                          i.quantity <= i.low_stock_threshold ? "low" : "good"
+                        }
+                      >
+                        {i.quantity <= i.low_stock_threshold
+                          ? "Low stock"
+                          : "In stock"}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              </Panel>
+              <form className="stock-save data-panel" onSubmit={saveStock}>
+                <h1>Add or restock item</h1>
+                <div>
+                  <input name="name" placeholder="Item name" required />
+                  <input name="sku" placeholder="SKU" required />
+                  <input
+                    name="quantity"
+                    type="number"
+                    min="0"
+                    placeholder="Quantity"
+                    required
+                  />
+                  <input
+                    name="threshold"
+                    type="number"
+                    min="0"
+                    defaultValue="5"
+                    required
+                  />
+                </div>
+                <button className="submit-sale">Save stock item</button>
+              </form>
+            </>
           )}
-          {tab === "roster" && <Roster />}
-          {tab === "commission" && <Commission sales={sales} />}
-          {tab === "performance" && <Performance leaderboard={leaderboard} />}
-          {tab === "close" && <CloseDay sales={sales} />}
+          {tab === "roster" && <RosterPanel />}
         </section>
       </div>
     </main>
   );
 }
-
-function Panel({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
+function Cards({ gp, low }: { gp: number; low: number }) {
   return (
-    <section className="telstra-panel">
-      <div className="telstra-panel-head">
-        <div>
-          <h1>{title}</h1>
-          <p>{description}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-function Kpis({
-  sales,
-  user,
-  stock,
-}: {
-  sales: Sale[];
-  user: User;
-  stock: typeof seedStock;
-}) {
-  const gp = sales
-    .filter((sale) => sale.staff === user.name)
-    .reduce((total, sale) => total + Number(sale.gp || 0), 0);
-  return (
-    <section className="telstra-kpis">
+    <section className="today-cards">
       <article>
-        <span>My GP today</span>
-        <strong>${gp.toLocaleString()}</strong>
-        <small>of $600 target</small>
+        <span>
+          My GP today ·{" "}
+          {new Date().toLocaleDateString("en-AU", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          })}
+        </span>
+        <strong>
+          {money(gp)} <small>/ $600 target</small>
+        </strong>
+        <em>{money(Math.max(600 - gp, 0))} to go</em>
+        <div className="mini-bars">
+          <i />
+          <i />
+          <i />
+          <i />
+        </div>
       </article>
       <article>
-        <span>Sales logged</span>
-        <strong>{sales.length}</strong>
-        <small>All stores</small>
+        <span>🔥 Hot offers this month</span>
+        <b>Double GP on DPC sales</b>
+        <p>All of July — iPhone 17 series and Galaxy S26 series</p>
       </article>
       <article>
         <span>Low stock alerts</span>
-        <strong>
-          {stock.filter((item) => item.quantity <= item.threshold).length}
-        </strong>
-        <small>Items needing attention</small>
+        <strong>{low}</strong>
+        <p>items need restocking</p>
       </article>
     </section>
   );
 }
-function Today({
-  sales,
-  onSubmit,
+function Board({
+  data,
+  user,
+  full = false,
 }: {
-  sales: Sale[];
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  data: [string, number][];
+  user: User;
+  full?: boolean;
+}) {
+  const top = data.slice(0, 3);
+  return (
+    <section className={`leaderboard-card ${full ? "full" : ""}`}>
+      <div className="leaderboard-header">
+        <span>
+          <i /> Live · team leaderboard this month
+        </span>
+        <small>All staff · database totals</small>
+      </div>
+      {!data.length ? (
+        <p className="today-empty">No monthly sales recorded yet.</p>
+      ) : (
+        <>
+          <div className="podiums">
+            {[top[1], top[0], top[2]].map(
+              (x, n) =>
+                x && (
+                  <div className={`podium podium-${n}`} key={x[0]}>
+                    <b>{n === 1 ? 1 : n === 0 ? 2 : 3}</b>
+                    <span>{initials(x[0])}</span>
+                    <small>
+                      {x[0]}
+                      {x[0] === user.name ? " · You" : ""}
+                    </small>
+                    <strong>{money(x[1])}</strong>
+                  </div>
+                ),
+            )}
+          </div>
+          <div className="leader-list">
+            {data.slice(3, full ? undefined : 7).map(([n, g], i) => (
+              <div key={n}>
+                <b>#{i + 4}</b>
+                <i>{initials(n)}</i>
+                <span>{n}</span>
+                <strong>{money(g)}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function Form({
+  user,
+  submit,
+}: {
+  user: User;
+  submit: (e: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <div className="telstra-today">
-      <form className="telstra-panel sale-form" onSubmit={onSubmit}>
-        <div className="telstra-panel-head">
-          <div>
-            <h1>Log a sale</h1>
-            <p>Sales are saved to PostgreSQL and start as Submitted.</p>
-          </div>
-        </div>
-        <div className="telstra-form-grid">
-          <label>
-            Date *
-            <input
-              defaultValue={new Date().toISOString().slice(0, 10)}
-              name="saleDate"
-              type="date"
-              required
-            />
-          </label>
-          <label>
-            Channel *
-            <select name="channel" required defaultValue="">
-              <option value="" disabled>
-                Select channel
-              </option>
-              <option>Walk-in</option>
-              <option>Referral</option>
-              <option>Phone</option>
-            </select>
-          </label>
-          <label>
-            Customer name *
-            <input name="customerName" placeholder="Customer name" required />
-          </label>
-          <label>
-            Mobile *<input name="contact" placeholder="0412 345 678" required />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" placeholder="customer@email.com" />
-          </label>
-          <label>
-            CAC
-            <input name="cac" placeholder="Billing account number" />
-          </label>
-          <label>
-            Product / plan *
-            <select name="category" required defaultValue="">
-              <option value="" disabled>
-                Select plan
-              </option>
-              <option>NBN Premium</option>
-              <option>5G Internet</option>
-              <option>Sim Only Plan</option>
-              <option>DPC Device</option>
-              <option>Accessory</option>
-            </select>
-          </label>
-          <label>
-            GP ($)
-            <input
-              name="gp"
-              min="0"
-              step="0.01"
-              type="number"
-              placeholder="0.00"
-            />
-          </label>
-          <label className="wide">
-            Notes
-            <input name="notes" placeholder="Anything worth flagging" />
-          </label>
-        </div>
-        <button className="button button-primary" type="submit">
-          Submit sale →
-        </button>
-      </form>
-      <Panel
-        title="Today's sales"
-        description={`${sales.length} sales logged across the workspace.`}
-      >
-        <SaleTable sales={sales.slice(0, 8)} />
-      </Panel>
+    <form className="sale-card" onSubmit={submit}>
+      <h1>Log a sale</h1>
+      <div className="sale-fields">
+        <label>
+          Date *
+          <input name="saleDate" type="date" defaultValue={today()} required />
+        </label>
+        <label>
+          Channel *
+          <select name="channel" defaultValue="" required>
+            <option value="" disabled>
+              — Select —
+            </option>
+            <option>Walk-in</option>
+            <option>Phone</option>
+            <option>Online</option>
+          </select>
+        </label>
+        <label>
+          Order number *
+          <input name="orderNumber" placeholder="e.g. ORD-10456" required />
+        </label>
+        <label>
+          Billing Account Number (CAC) *
+          <input name="cac" placeholder="e.g. BAN-8827441" required />
+        </label>
+        <label className="span-2">
+          Customer name *
+          <input name="customerName" placeholder="Jordan Blake" required />
+        </label>
+        <label>
+          Mobile number *
+          <input name="contact" placeholder="0412 345 678" required />
+        </label>
+        <label>
+          Email *
+          <input
+            name="email"
+            type="email"
+            placeholder="jordan@email.com"
+            required
+          />
+        </label>
+        <label className="span-2">
+          Product *
+          <select name="category" defaultValue="" required>
+            <option value="" disabled>
+              — Select product —
+            </option>
+            <option>NBN Premium</option>
+            <option>5G Internet</option>
+            <option>Sim Only Plan</option>
+            <option>DPC Device</option>
+          </select>
+        </label>
+        <label>
+          Sales rep *<input value={user.name} readOnly />
+        </label>
+        <label>
+          Store
+          <input value={user.store} readOnly />
+        </label>
+        <label className="span-2">
+          Marketing consent
+          <select name="marketingConsent">
+            <option>Opted In</option>
+            <option>Opted Out</option>
+          </select>
+        </label>
+        <label className="span-2">
+          GP ($) *
+          <input
+            name="gp"
+            type="number"
+            min="0"
+            step=".01"
+            placeholder="120"
+            required
+          />
+        </label>
+        <label className="span-2">
+          Stock item used
+          <select name="stockItemUsed">
+            <option value="">— None, plan/service only —</option>
+            <option>5G Modem</option>
+            <option>NBN Modem</option>
+            <option>SIM Card Pack</option>
+          </select>
+        </label>
+        <label className="span-2">
+          Qty
+          <input
+            name="quantity"
+            type="number"
+            min="1"
+            defaultValue="1"
+            required
+          />
+        </label>
+        <label className="span-2">
+          Notes (optional)
+          <input
+            name="notes"
+            placeholder="Anything worth flagging about this sale"
+          />
+        </label>
+      </div>
+      <button className="submit-sale">Submit Sale</button>
+      <p className="sale-footnote">
+        Fields marked * are mandatory. Every sale is saved under your profile
+        and appears in the team leaderboard.
+      </p>
+    </form>
+  );
+}
+function Table({ sales, loading }: { sales: Sale[]; loading: boolean }) {
+  if (loading) return <p className="today-empty">Loading live data…</p>;
+  if (!sales.length)
+    return <p className="today-empty">No sales logged yet today.</p>;
+  return (
+    <div className="sales-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Contact</th>
+            <th>Plan</th>
+            <th>Rep</th>
+            <th>Serial</th>
+            <th>CAC</th>
+            <th>GP</th>
+            <th>Notes</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sales.map((s) => (
+            <tr key={s.id}>
+              <td>{s.customer_name}</td>
+              <td>{s.contact_number}</td>
+              <td>{s.category}</td>
+              <td>{s.staff}</td>
+              <td>{s.stock_item_used || "—"}</td>
+              <td>{s.cac || "—"}</td>
+              <td>{money(Number(s.gp || 0))}</td>
+              <td>{s.notes || "—"}</td>
+              <td>
+                <span className="status-pill">{s.status}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
-function Leaderboard({ data, user }: { data: [string, number][]; user: User }) {
-  return (
-    <Panel
-      title="Team leaderboard"
-      description="Monthly GP ranking. Customer details are never shown here."
-    >
-      <div className="leaderboard">
-        {data.length ? (
-          data.map(([name, gp], index) => (
-            <div
-              className={name === user.name ? "leader-row mine" : "leader-row"}
-              key={name}
-            >
-              <b>#{index + 1}</b>
-              <span>{name}</span>
-              <i
-                style={{
-                  width: `${Math.max(8, (gp / (data[0]?.[1] || 1)) * 100)}%`,
-                }}
-              ></i>
-              <strong>${gp.toLocaleString()}</strong>
-            </div>
-          ))
-        ) : (
-          <p className="telstra-empty">No sales to rank yet.</p>
-        )}
-      </div>
-    </Panel>
-  );
-}
-function Stock({
-  stock,
-  canManage,
-  onSubmit,
+function Panel({
+  title,
+  text,
+  children,
 }: {
-  stock: typeof seedStock;
-  canManage: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  title: string;
+  text: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <>
-      <Panel
-        title="In-store stock"
-        description="Live store stock view; low levels are highlighted."
-      >
-        <div className="stock-list">
-          {stock.map((item) => (
-            <div key={item.sku}>
-              <b>
-                {item.name}
-                <small>{item.sku}</small>
-              </b>
-              <span>{item.quantity} units</span>
-              <em className={item.quantity <= item.threshold ? "low" : "ok"}>
-                {item.quantity <= item.threshold ? "Low stock" : "In stock"}
-              </em>
-            </div>
-          ))}
-        </div>
-      </Panel>
-      {canManage && (
-        <form className="telstra-panel stock-form" onSubmit={onSubmit}>
-          <h1>Add / restock item</h1>
-          <div className="telstra-form-grid">
-            <label>
-              Item name
-              <input name="item" required />
-            </label>
-            <label>
-              SKU
-              <input name="sku" required />
-            </label>
-            <label>
-              Quantity
-              <input name="quantity" type="number" min="0" required />
-            </label>
-            <label>
-              Low stock at
-              <input
-                name="threshold"
-                type="number"
-                min="0"
-                defaultValue="5"
-                required
-              />
-            </label>
-          </div>
-          <button className="button button-primary">Save stock item</button>
-        </form>
-      )}
-    </>
-  );
-}
-function Roster() {
-  return (
-    <Panel
-      title="Weekly shift roster"
-      description="Team roster and clock-on are ready for PostgreSQL data."
-    >
-      <div className="roster-grid">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-          <div key={day}>
-            <b>{day}</b>
-            <span>9:00 AM – 5:00 PM</span>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-function Commission({ sales }: { sales: Sale[] }) {
-  const pending = sales.filter((sale) => sale.status !== "Paid");
-  return (
-    <Panel
-      title="Commission reconciliation"
-      description="Match Telstra reports and create claims for exceptions."
-    >
-      <div className="commission-summary">
-        <article>
-          <span>Matched & paid</span>
-          <b>{sales.filter((sale) => sale.status === "Paid").length}</b>
-        </article>
-        <article>
-          <span>Exceptions</span>
-          <b>{pending.length}</b>
-        </article>
-        <article>
-          <span>Claims</span>
-          <b>0</b>
-        </article>
-      </div>
-      <SaleTable sales={pending} />
-    </Panel>
-  );
-}
-function Performance({ leaderboard }: { leaderboard: [string, number][] }) {
-  return (
-    <Panel
-      title="Staff performance"
-      description="Management summary for this month."
-    >
-      <div className="performance-list">
-        {leaderboard.map(([name, gp]) => (
-          <div key={name}>
-            <b>{name}</b>
-            <span>${gp.toLocaleString()} GP</span>
-            <small>Sales and follow-up reporting ready</small>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-function CloseDay({ sales }: { sales: Sale[] }) {
-  const gp = sales.reduce((sum, sale) => sum + Number(sale.gp || 0), 0);
-  return (
-    <Panel
-      title="Daily close"
-      description="Review today's results before sending the store report."
-    >
-      <div className="commission-summary">
-        <article>
-          <span>Daily GP</span>
-          <b>${gp.toLocaleString()}</b>
-        </article>
-        <article>
-          <span>Sales</span>
-          <b>{sales.length}</b>
-        </article>
-        <article>
-          <span>Activated</span>
-          <b>{sales.filter((sale) => sale.status === "Activated").length}</b>
-        </article>
-      </div>
-      <button
-        className="button button-primary"
-        onClick={() =>
-          alert("Daily report prepared for WhatsApp and email delivery.")
-        }
-      >
-        Prepare daily report
-      </button>
-    </Panel>
+    <section className="data-panel">
+      <h1>{title}</h1>
+      <p>{text}</p>
+      {children}
+    </section>
   );
 }
