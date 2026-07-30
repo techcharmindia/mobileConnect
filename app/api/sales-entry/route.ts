@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSessionUser } from "@/lib/session";
 
 export async function POST(req: Request) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ message: "Please sign in again." }, { status: 401 });
   try {
     const body = await req.json();
 
@@ -13,8 +16,6 @@ export async function POST(req: Request) {
       contactNumber,
       email,
       category,
-      storeLocation,
-      staff,
       notes,
       status,
       orderNumber,
@@ -55,8 +56,8 @@ export async function POST(req: Request) {
       contactNumber,
       email,
       category,
-      storeLocation,
-      staff,
+      user.store,
+      user.name,
       notes,
       status,
       orderNumber || null,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { createSessionToken, sessionCookie } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
@@ -26,14 +27,10 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        store: user.store,
-      },
-    });
+    const safeUser = { id: user.id, name: user.name, role: user.role, store: user.store };
+    const response = NextResponse.json({ user: safeUser });
+    response.cookies.set(sessionCookie(createSessionToken(safeUser)));
+    return response;
   } catch {
     return NextResponse.json(
       { message: "Unable to verify the Telstra login right now." },

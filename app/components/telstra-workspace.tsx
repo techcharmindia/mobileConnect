@@ -203,7 +203,7 @@ export default function TelstraWorkspace() {
           >
             Stock {low.length > 0 && <em />}
           </button>
-          <button onClick={() => setTab("roster")}>Roster</button>
+          <button className={tab === "roster" ? "active" : ""} onClick={() => setTab("roster")}>Roster</button>
           <div className="today-account">
             <p>Logged in</p>
             <b>{user.name}</b>
@@ -299,7 +299,7 @@ export default function TelstraWorkspace() {
               </form>
             </>
           )}
-          {tab === "roster" && <RosterPanel />}
+          {tab === "roster" && <RosterPanel user={user} />}
         </section>
       </div>
     </main>
@@ -336,7 +336,7 @@ function Cards({ gp, low }: { gp: number; low: number }) {
       <article>
         <span>Low stock alerts</span>
         <strong>{low}</strong>
-        <p>items need restocking</p>
+        <p>Items need restocking</p>
       </article>
     </section>
   );
@@ -357,7 +357,7 @@ function Board({
         <span>
           <i /> Live · team leaderboard this month
         </span>
-        <small>All staff · database totals</small>
+        <small>All staff ·</small>
       </div>
       {!data.length ? (
         <p className="today-empty">No monthly sales recorded yet.</p>
@@ -379,16 +379,16 @@ function Board({
                 ),
             )}
           </div>
-          <div className="leader-list">
+          {/* <div className="leader-list">
             {data.slice(3, full ? undefined : 7).map(([n, g], i) => (
               <div key={n}>
-                <b>#{i + 4}</b>
+                <b>#{i + 2}</b>
                 <i>{initials(n)}</i>
                 <span>{n}</span>
                 <strong>{money(g)}</strong>
               </div>
             ))}
-          </div>
+          </div> */}
         </>
       )}
     </section>
