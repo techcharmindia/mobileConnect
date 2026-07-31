@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 
-const isDate = (value: unknown) =>
+const isDate = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+// Canonical roster key: the Monday of the selected Monday–Sunday calendar week.
+// UTC calendar arithmetic prevents server/browser timezone date shifts.
+const weekStartFor = (value: string) => {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return date.toISOString().slice(0, 10);
+};
 
 export async function GET(request: Request) {
   const user = await getSessionUser();
@@ -14,37 +23,35 @@ export async function GET(request: Request) {
     );
   try {
     const weekStart = new URL(request.url).searchParams.get("weekStart");
-    const requestedWeek = isDate(weekStart) ? weekStart : null;
-    const week = await pool.query(
-      `SELECT id, week_start, status, published_at FROM roster_weeks
-       WHERE week_start = COALESCE($1::date, date_trunc('week', CURRENT_DATE)::date) LIMIT 1`,
-      [requestedWeek],
-    );
+    const requestedWeek = isDate(weekStart) ? weekStartFor(weekStart) : null;
+    const targetWeek = requestedWeek ?? (await pool.query("SELECT date_trunc('week', CURRENT_DATE)::date AS week_start")).rows[0].week_start;
+    const exactWeek = await pool.query(`SELECT id, week_start, status, published_at FROM roster_weeks WHERE week_start = $1::date LIMIT 1`, [targetWeek]);
+    const week = exactWeek.rows[0] && (user.role === "admin" || exactWeek.rows[0].status === "published")
+      ? exactWeek
+      : await pool.query(`SELECT id, week_start, status, published_at FROM roster_weeks WHERE week_start <= $1::date AND status = 'published' ORDER BY week_start DESC LIMIT 1`, [targetWeek]);
     const rosterWeek = week.rows[0];
     const staff = await pool.query(
       "SELECT id, name, store FROM staff_users WHERE is_active = TRUE AND role = 'sales' ORDER BY name",
     );
     if (!rosterWeek)
       return NextResponse.json({
-        weekStart: requestedWeek,
+        weekStart: targetWeek,
         status: "published",
         publishedAt: null,
         staff: staff.rows,
         shifts: [],
       });
-    const source =
-      user.role === "admin"
-        ? "roster_week_shifts"
-        : "published_roster_week_shifts";
+    const source = user.role === "admin" && rosterWeek.week_start === targetWeek ? "roster_week_shifts" : "published_roster_week_shifts";
     const shifts = await pool.query(
-      `SELECT staff_user_id, shift_date, shift_label FROM ${source}
+      `SELECT staff_user_id, ($2::date + (shift_date - $3::date))::date AS shift_date, shift_label FROM ${source}
        WHERE roster_week_id = $1 ORDER BY shift_date, staff_user_id`,
-      [rosterWeek.id],
+      [rosterWeek.id, targetWeek, rosterWeek.week_start],
     );
     return NextResponse.json({
-      weekStart: rosterWeek.week_start,
+      weekStart: targetWeek,
       status: user.role === "admin" ? rosterWeek.status : "published",
       publishedAt: rosterWeek.published_at,
+      inherited: rosterWeek.week_start !== targetWeek,
       staff: staff.rows,
       shifts: shifts.rows,
       canManage: user.role === "admin",
@@ -94,21 +101,38 @@ export async function POST(request: Request) {
           { message: "A staff member, date and shift are required." },
           { status: 400 },
         );
-      const week = await pool.query(
-        `INSERT INTO roster_weeks (week_start, status) VALUES ($1, 'draft') ON CONFLICT (week_start) DO UPDATE SET status = CASE WHEN roster_weeks.status = 'published' THEN 'draft' ELSE roster_weeks.status END RETURNING id`,
-        [body.weekStart],
-      );
-      await pool.query(
-        `INSERT INTO roster_week_shifts (roster_week_id, staff_user_id, shift_date, shift_label)
-        VALUES ($1, $2, $3, $4) ON CONFLICT (roster_week_id, staff_user_id, shift_date)
-        DO UPDATE SET shift_label = EXCLUDED.shift_label`,
-        [
-          week.rows[0].id,
-          body.staffUserId,
-          body.shiftDate,
-          body.shiftLabel.trim(),
-        ],
-      );
+      const canonicalWeekStart = weekStartFor(body.weekStart);
+      if (weekStartFor(body.shiftDate) !== canonicalWeekStart)
+        return NextResponse.json(
+          { message: "The shift date must be inside the selected Monday–Sunday roster week." },
+          { status: 400 },
+        );
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const created = await client.query(`INSERT INTO roster_weeks (week_start, status) VALUES ($1, 'draft') ON CONFLICT (week_start) DO NOTHING RETURNING id`, [canonicalWeekStart]);
+        let rosterWeekId = created.rows[0]?.id;
+        if (rosterWeekId) {
+          const template = await client.query(`SELECT id, week_start FROM roster_weeks WHERE week_start < $1::date AND status = 'published' ORDER BY week_start DESC LIMIT 1`, [canonicalWeekStart]);
+          if (template.rows[0]) await client.query(
+            `INSERT INTO roster_week_shifts (roster_week_id, staff_user_id, shift_date, shift_label)
+             SELECT $1, staff_user_id, ($2::date + (shift_date - $3::date))::date, shift_label
+             FROM published_roster_week_shifts WHERE roster_week_id = $4`,
+            [rosterWeekId, canonicalWeekStart, template.rows[0].week_start, template.rows[0].id],
+          );
+        } else {
+          const existing = await client.query("SELECT id FROM roster_weeks WHERE week_start = $1", [canonicalWeekStart]);
+          rosterWeekId = existing.rows[0].id;
+        }
+        await client.query("UPDATE roster_weeks SET status = 'draft' WHERE id = $1", [rosterWeekId]);
+        await client.query(`INSERT INTO roster_week_shifts (roster_week_id, staff_user_id, shift_date, shift_label)
+          VALUES ($1, $2, $3, $4) ON CONFLICT (roster_week_id, staff_user_id, shift_date)
+          DO UPDATE SET shift_label = EXCLUDED.shift_label`, [rosterWeekId, body.staffUserId, body.shiftDate, body.shiftLabel.trim()]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally { client.release(); }
       return NextResponse.json({ ok: true });
     }
     if (body.action === "publish") {
@@ -117,13 +141,14 @@ export async function POST(request: Request) {
           { message: "A valid roster week is required." },
           { status: 400 },
         );
+      const canonicalWeekStart = weekStartFor(body.weekStart);
       const client = await pool.connect();
       let week;
       try {
         await client.query("BEGIN");
         week = await client.query(
           `UPDATE roster_weeks SET status = 'published', published_at = NOW(), published_by = $2 WHERE week_start = $1 RETURNING id, published_at`,
-          [body.weekStart, user.id],
+          [canonicalWeekStart, user.id],
         );
         if (!week.rows[0]) throw new Error("missing_week");
         await client.query(

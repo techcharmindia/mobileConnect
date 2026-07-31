@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS clock_events (
 
 CREATE INDEX IF NOT EXISTS clock_events_staff_time_idx ON clock_events (staff_user_id, occurred_at DESC);
 
+-- One-time data repair: any selected weekday must be stored as that week's
+-- Monday. For example, 04-08-2026 becomes 03-08-2026.
+UPDATE roster_weeks
+SET week_start = date_trunc('week', week_start)::date
+WHERE week_start <> date_trunc('week', week_start)::date;
+
 CREATE INDEX IF NOT EXISTS sales_entry_staff_date_idx ON sales_entry (staff, sale_date DESC);
 CREATE INDEX IF NOT EXISTS sales_entry_status_idx ON sales_entry (status);
 

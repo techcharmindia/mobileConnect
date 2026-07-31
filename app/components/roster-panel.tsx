@@ -46,6 +46,7 @@ export default function RosterPanel({ user }: { user: User }) {
   const [clock, setClock] = useState<ClockStaff[]>([]);
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [status, setStatus] = useState("published");
+  const [inherited, setInherited] = useState(false);
   const [notice, setNotice] = useState("");
   const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,6 +63,7 @@ export default function RosterPanel({ user }: { user: User }) {
       setShifts(data.shifts ?? []);
       setPublishedAt(data.publishedAt);
       setStatus(data.status ?? "published");
+      setInherited(Boolean(data.inherited));
     } else setNotice("Roster could not load. Please sign in again.");
     if (clockResponse.ok) setClock((await clockResponse.json()).staff ?? []);
   }, [weekStart]);
@@ -78,6 +80,7 @@ export default function RosterPanel({ user }: { user: User }) {
   const me = clock.find((person) => person.id === user.id);
   const isClockedIn = Boolean(me?.clocked_in_at);
   const stores = [...new Set(staff.map((person) => person.store))];
+  const selectedWeekLabel = `${calendarDate(dates[0]).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })} – ${calendarDate(dates[6]).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })}`;
 
   async function change(action: string, body: Record<string, unknown>) {
     setSaving(true);
@@ -149,7 +152,7 @@ export default function RosterPanel({ user }: { user: User }) {
           >
             {isClockedIn ? "Clock Out" : "Clock In"}
           </button>
-          <button
+          {/* <button
             className="face-preview"
             onClick={() =>
               setNotice(
@@ -158,11 +161,10 @@ export default function RosterPanel({ user }: { user: User }) {
             }
           >
             🔓 Use Face ID / Face Unlock instead
-          </button>
+          </button> */}
           <p className="roster-note">
             Each staff member logs into their own profile to clock on — nobody
-            clocks in on someone else&apos;s behalf. Face ID is not connected to
-            a biometric service.
+            clocks in on someone else&apos;s behalf.
           </p>
         </section>
         <section className="data-panel">
@@ -251,12 +253,14 @@ export default function RosterPanel({ user }: { user: User }) {
             </p>
           </div>
           <div className="roster-actions">
-            <input
-              aria-label="Roster week"
-              type="date"
-              value={weekStart}
-              onChange={(e) => setWeekStart(monday(e.target.value))}
-            />
+            <div className="range-picker">
+              <label htmlFor="roster-week-start">Select a range</label>
+              <div>
+                <input id="roster-week-start" aria-label="Roster week start" type="date" value={weekStart} onChange={(e) => setWeekStart(monday(e.target.value))} />
+                <span>to</span>
+                <input aria-label="Roster week end" type="date" value={dates[6]} readOnly tabIndex={-1} />
+              </div>
+            </div>
             {admin && (
               <button
                 className="publish-button"
@@ -274,6 +278,7 @@ export default function RosterPanel({ user }: { user: User }) {
             ? "Admin draft — edits are not visible to staff until published."
             : "View only — editing shifts is Admin only."}
         </p>
+        <div className="selected-range"><b>Selected range:</b><span>{selectedWeekLabel}</span>{inherited && <small>Using the latest published roster until Admin changes this week.</small>}</div>
         <div className="sales-table">
           <table className="weekly-table">
             <thead>
