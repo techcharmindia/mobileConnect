@@ -526,6 +526,11 @@
   color: #6f6a88;
   font-size: 11px;
   line-height: 1.45;
+  max-width: fit-content;
+}
+.roster-info{
+  display: flex;
+  justify-content: space-between;
 }
 .roster-actions {
   display: flex;
@@ -716,6 +721,8 @@
 }
 .selected-range {
   display: flex;
+  justify-self:flex-end;
+  max-width: fit-content;
   gap: 28px;
   margin: 12px 0 16px;
   padding: 13px 16px;
