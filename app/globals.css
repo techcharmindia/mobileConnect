@@ -501,7 +501,7 @@
   text-align: center;
 }
 .data-panel + .data-panel {
-  margin-top: 16px;
+  /* margin-top: 16px; */
 }
 .roster-page {
   display: grid;
@@ -652,6 +652,84 @@
 .shift-on {
   color: #6f6a88;
   font-size: 11px;
+}
+.roster-selected-week {
+  display: grid;
+  width: max-content;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #ddd7f5;
+  border-radius: 8px;
+  color: #40336f;
+  background: #f7f5ff;
+  font-size: 11px;
+}
+.roster-selected-week b {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.roster-selected-week span {
+  font-weight: 700;
+}
+.roster-selected-week small {
+  color: #6f6a88;
+  font-size: 10px;
+}
+.range-picker {
+  display: grid;
+  gap: 5px;
+}
+.range-picker > label {
+  color: #4d4b5b;
+  font-size: 11px;
+  font-weight: 700;
+}
+.range-picker > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border: 2px solid #a9c1ff;
+  border-radius: 8px;
+  background: #edf2ff;
+  box-shadow: 0 0 0 2px #dce6ff;
+}
+.range-picker input {
+  width: 132px;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: 5px;
+  outline: 0;
+  background: #fff;
+  font-size: 11px;
+}
+.range-picker input[readonly] {
+  color: #616b80;
+  background: #f3f5fa;
+}
+.range-picker span {
+  color: #61708c;
+  font-size: 11px;
+  font-weight: 700;
+}
+.selected-range {
+  display: flex;
+  gap: 28px;
+  margin: 12px 0 16px;
+  padding: 13px 16px;
+  border: 1px solid #cceccb;
+  border-radius: 7px;
+  color: #268453;
+  background: #e8f9e7;
+  font-size: 12px;
+}
+.selected-range b {
+  font-weight: 700;
+}
+.selected-range span {
+  font-weight: 800;
 }
 .stock-grid {
   display: grid;
