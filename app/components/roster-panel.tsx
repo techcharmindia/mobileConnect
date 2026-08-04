@@ -279,7 +279,7 @@ export default function RosterPanel({ user }: { user: User }) {
             ? "Admin draft — edits are not visible to staff until published."
             : "View only — editing shifts is Admin only."}
         </p>
-        <div className="selected-range"><b>Selected range:</b><span>{selectedWeekLabel}</span>{inherited && <small>Using the latest published roster until Admin changes this week.</small>}</div>
+        {/* <div className="selected-range"><b>Selected range:</b><span>{selectedWeekLabel}</span>{inherited && <small>Using the latest published roster until Admin changes this week.</small>}</div> */}
         </div>
         <div className="sales-table">
           <table className="weekly-table">
