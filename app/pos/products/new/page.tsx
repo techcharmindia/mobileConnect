@@ -122,7 +122,7 @@ export default function NewProductPage() {
           ].map((item) => (
             <Link
               key={item}
-              href="/pos"
+              href={`/pos?section=${encodeURIComponent(item)}`}
               className={item === "Products" ? "active" : ""}
             >
               {item}

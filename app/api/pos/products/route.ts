@@ -101,7 +101,7 @@ export async function GET(request: Request) {
     const sortDir = searchParams.get("sortDir") === "asc" ? "ASC" : "DESC";
     const sortBy = ALLOWED_SORT_COLUMNS.includes(sortByRaw) ? sortByRaw : "id";
 
-    const values: any[] = [];
+    const values: Array<string | number | boolean | Date | null> = [];
     let i = 1;
     const conditions: string[] = [];
 
@@ -372,7 +372,7 @@ export async function PATCH(request: Request) {
     ];
 
     const setClauses: string[] = [];
-    const values: any[] = [];
+    const values: Array<string | number | boolean | Date | null> = [];
     let i = 1;
 
     for (const key of allowedFields) {
