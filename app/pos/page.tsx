@@ -1,5 +1,10 @@
-import PosWorkspace from "../components/pos-workspace";
+import { Suspense } from "react";
+import PosWorkspace from "../components/pos/pos-workspace";
 
 export default function PosPage() {
-  return <PosWorkspace />;
+  return (
+    <Suspense fallback={null}>
+      <PosWorkspace />
+    </Suspense>
+  );
 }

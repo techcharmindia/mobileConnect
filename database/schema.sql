@@ -126,6 +126,45 @@ CREATE INDEX IF NOT EXISTS idx_pos_products_brand
 CREATE INDEX IF NOT EXISTS idx_pos_products_quantity 
   ON pos_products (quantity);
 
+-- Miscellaneous (non-catalogue) items sold through the register
+CREATE TABLE IF NOT EXISTS miscellaneous_items (
+  id SERIAL PRIMARY KEY,
+  type VARCHAR(100) NOT NULL DEFAULT 'Miscellaneous',
+  name VARCHAR(180) NOT NULL,
+  description TEXT,
+  is_barcode BOOLEAN NOT NULL DEFAULT false,
+  commission BOOLEAN NOT NULL DEFAULT false,
+  on_pos BOOLEAN NOT NULL DEFAULT true,
+  retail_price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (retail_price >= 0),
+  cost_price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
+  tax_class VARCHAR(50) NOT NULL DEFAULT 'gst',
+  tax_inclusive BOOLEAN NOT NULL DEFAULT true,
+  image TEXT,
+  bulk_discount BOOLEAN NOT NULL DEFAULT false,
+  percentage NUMERIC(6,2) NOT NULL DEFAULT 0 CHECK (percentage >= 0),
+  percentage_calc VARCHAR(30) NOT NULL DEFAULT 'Before Tax',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Compatibility for tables created before the percentage fields existed.
+ALTER TABLE miscellaneous_items
+  ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0 CHECK (percentage >= 0),
+  ADD COLUMN IF NOT EXISTS percentage_calc VARCHAR(30) NOT NULL DEFAULT 'Before Tax';
+
+DROP TRIGGER IF EXISTS set_timestamp_misc ON miscellaneous_items;
+
+CREATE TRIGGER set_timestamp_misc
+BEFORE UPDATE ON miscellaneous_items
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+
+CREATE INDEX IF NOT EXISTS idx_misc_items_name
+  ON miscellaneous_items USING gin (name gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_misc_items_created_at
+  ON miscellaneous_items (created_at);
+
 CREATE TABLE IF NOT EXISTS roster_shifts (
   id SERIAL PRIMARY KEY,
   staff_user_id INTEGER NOT NULL REFERENCES staff_users(id) ON DELETE CASCADE,
