@@ -17,7 +17,15 @@ export async function PATCH(request: Request) {
     const { id, status } = await request.json();
     if (
       !Number.isInteger(id) ||
-      !["Submitted", "In Progress", "Activated", "Paid"].includes(status)
+      ![
+        "Submitted",
+        "In Progress",
+        "Activated",
+        "Paid",
+        "Pending",
+        "Verified",
+        "Cancelled",
+      ].includes(status)
     ) {
       return NextResponse.json(
         { message: "Invalid order update." },

@@ -489,10 +489,49 @@
 .status-pill {
   padding: 3px 9px;
   border-radius: 20px;
-  color: #de8a0f;
-  background: #fcefd8;
   font-size: 10.5px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.status-select {
+  border: none;
+  appearance: none;
+  background: transparent;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: inherit;
+  outline: none;
+  min-width: 70px;
+}
+.status-select option {
+  color: #111;
+}
+.status-pill-pending {
+  color: #b76d05;
+  background: #ffeacc;
+}
+.status-pill-verified {
+  color: #0f5b3a;
+  background: #def7e0;
+}
+.status-pill-paid {
+  color: #0a4f8b;
+  background: #d9e9ff;
+}
+.status-pill-cancelled {
+  color: #7a2419;
+  background: #fce4e1;
+}
+.status-pill-submitted,
+.status-pill-in-progress,
+.status-pill-activated {
+  color: #5b3df5;
+  background: #f1effa;
 }
 .today-empty {
   padding: 30px 10px;
