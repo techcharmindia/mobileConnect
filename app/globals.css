@@ -498,7 +498,7 @@
 }
 .status-select {
   border: none;
-  appearance: none;
+  appearance: auto;
   background: transparent;
   padding: 3px 9px;
   border-radius: 20px;
@@ -512,19 +512,19 @@
   color: #111;
 }
 .status-pill-pending {
-  color: #b76d05;
-  background: #ffeacc;
+  color: #b76d05 !important;
+  background: #ffeacc !important;
 }
 .status-pill-verified {
-  color: #0f5b3a;
-  background: #def7e0;
+  color: #0f5b3a !important;
+  background: #def7e0 !important;
 }
 .status-pill-paid {
-  color: #0a4f8b;
-  background: #d9e9ff;
+  color: #0a4f8b !important;
+  background: #d9e9ff !important;
 }
 .status-pill-cancelled {
-  color: #7a2419;
+  color: #7a2419 !important;
   background: #fce4e1;
 }
 .status-pill-submitted,
