@@ -19,7 +19,7 @@ type Sale = {
   store_location?: string;
   staff?: string;
   notes?: string;
-  status: string;
+  status: "Pending" | "Verified" | "Paid" | string;
   gp?: number;
   order_number?: string;
   stock_item_used?: string;
@@ -34,9 +34,9 @@ type Stock = {
 };
 const fallback: User = {
   id: 0,
-  name: "Vanshika",
+  name: "",
   role: "sales",
-  store: "Sunnybank Hills",
+  store: "",
 };
 const today = () => {
   const date = new Date();
@@ -53,14 +53,38 @@ const initials = (n: string) =>
     .join("")
     .slice(0, 2);
 export default function TelstraWorkspace() {
-  const [user] = useState<User>(() =>
-    typeof window === "undefined"
-      ? fallback
-      : JSON.parse(
-          sessionStorage.getItem("telstra-user") || JSON.stringify(fallback),
-        ),
-  );
-  const [tab, setTab] = useState("today");
+  // const [user] = useState<User>(() =>
+  //   typeof window === "undefined"
+  //     ? fallback
+  //     : JSON.parse(
+  //         sessionStorage.getItem("telstra-user") || JSON.stringify(fallback),
+  //       ),
+  // );
+  const [user, setUser] = useState<User>(fallback);
+  const [tab, setTab] = useState<string>("today");
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("telstra-user");
+
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        // Ignore invalid JSON and keep the fallback user.
+      }
+    }
+
+    const savedTab = sessionStorage.getItem("telstra-tab");
+    if (savedTab) {
+      setTab(savedTab);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("telstra-tab", tab);
+    }
+  }, [tab]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [stock, setStock] = useState<Stock[]>([]);
   const [notice, setNotice] = useState("");
@@ -121,7 +145,7 @@ export default function TelstraWorkspace() {
       storeLocation: user.store,
       staff: user.name,
       notes: f.get("notes"),
-      status: "Pending",
+      status: (f.get("status") as string) || "Pending",
       gp: Number(f.get("gp")),
       marketingConsent: f.get("marketingConsent"),
       stockItemUsed: f.get("stockItemUsed"),
@@ -141,6 +165,24 @@ export default function TelstraWorkspace() {
     form.reset();
     setNotice("Sale saved — Today, My sales and the live leaderboard updated.");
   }
+  async function updateSaleStatus(id: number, status: string) {
+    const response = await fetch("/api/telstra/sales", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+
+    if (!response.ok) {
+      setNotice("Sale status could not be updated.");
+      return;
+    }
+
+    const result = await response.json();
+    setSales((previous) =>
+      previous.map((sale) => (sale.id === id ? result.sale : sale)),
+    );
+  }
+
   async function saveStock(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
@@ -234,7 +276,12 @@ export default function TelstraWorkspace() {
                 <section className="sales-card">
                   <h1>Today’s sales</h1>
                   <p>Live sales across all staff today</p>
-                  <Table sales={todays} loading={loading} />
+                  <Table
+                    sales={todays}
+                    loading={loading}
+                    onStatusChange={updateSaleStatus}
+                    currentUser={user}
+                  />
                 </section>
               </div>
             </>
@@ -244,7 +291,12 @@ export default function TelstraWorkspace() {
               title="My sales"
               text="Only sales saved under your staff profile."
             >
-              <Table sales={mine} loading={loading} />
+              <Table
+                sales={mine}
+                loading={loading}
+                onStatusChange={updateSaleStatus}
+                currentUser={user}
+              />
             </Panel>
           )}
           {tab === "leader" && <Board data={ranking} user={user} full />}
@@ -472,6 +524,14 @@ function Form({
           </select>
         </label>
         <label className="span-2">
+          Status *
+          <select name="status" defaultValue="Pending" required>
+            <option>Pending</option>
+            <option>Verified</option>
+            <option>Paid</option>
+          </select>
+        </label>
+        <label className="span-2">
           GP ($) *
           <input
             name="gp"
@@ -517,7 +577,17 @@ function Form({
     </form>
   );
 }
-function Table({ sales, loading }: { sales: Sale[]; loading: boolean }) {
+function Table({
+  sales,
+  loading,
+  onStatusChange,
+  currentUser,
+}: {
+  sales: Sale[];
+  loading: boolean;
+  onStatusChange: (id: number, status: string) => void;
+  currentUser: User;
+}) {
   if (loading) return <p className="today-empty">Loading live data…</p>;
   if (!sales.length)
     return <p className="today-empty">No sales logged yet today.</p>;
@@ -549,7 +619,30 @@ function Table({ sales, loading }: { sales: Sale[]; loading: boolean }) {
               <td>{money(Number(s.gp || 0))}</td>
               <td>{s.notes || "—"}</td>
               <td>
-                <span className="status-pill">{s.status}</span>
+                {s.staff === currentUser.name ? (
+                  <select
+                    className={`status-select status-pill status-pill-${s.status?.toLowerCase().replace(/\s+/g, "-")}`}
+                    value={s.status}
+                    onChange={(event) => onStatusChange(s.id, event.target.value)}
+                  >
+                    {[
+                      ...(s.status && !["Pending", "Verified", "Paid"].includes(s.status)
+                        ? [s.status]
+                        : []),
+                      "Pending",
+                      "Verified",
+                      "Paid",
+                    ].map((statusOption) => (
+                      <option key={statusOption} value={statusOption}>
+                        {statusOption}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className={`status-pill status-pill-${s.status?.toLowerCase().replace(/\s+/g, "-")}`}>
+                    {s.status}
+                  </span>
+                )}
               </td>
             </tr>
           ))}
