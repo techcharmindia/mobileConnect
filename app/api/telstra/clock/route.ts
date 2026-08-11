@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { telstraPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET() {
   try {
-    const result = await pool.query(`
+    const result = await telstraPool.query(`
       SELECT s.id, s.name, s.store,
         MAX(c.occurred_at) FILTER (WHERE c.event_type = 'clock_in') AS clocked_in_at,
         (ARRAY_AGG(c.event_type ORDER BY c.occurred_at DESC))[1] AS last_event
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         { message: "A valid PIN and clock action are required." },
         { status: 400 },
       );
-    const verified = await pool.query(
+    const verified = await telstraPool.query(
       "SELECT pin FROM staff_users WHERE id = $1 AND is_active = TRUE",
       [user.id],
     );
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
         { message: "That PIN does not match your profile." },
         { status: 401 },
       );
-    const last = await pool.query(
+    const last = await telstraPool.query(
       "SELECT event_type FROM clock_events WHERE staff_user_id = $1 AND occurred_at::date = CURRENT_DATE ORDER BY occurred_at DESC LIMIT 1",
       [user.id],
     );
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
-    const saved = await pool.query(
+    const saved = await telstraPool.query(
       "INSERT INTO clock_events (staff_user_id, event_type) VALUES ($1, $2) RETURNING occurred_at",
       [user.id, action],
     );

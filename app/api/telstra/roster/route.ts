@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { telstraPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 
 const isDate = (value: unknown): value is string =>
@@ -24,13 +24,13 @@ export async function GET(request: Request) {
   try {
     const weekStart = new URL(request.url).searchParams.get("weekStart");
     const requestedWeek = isDate(weekStart) ? weekStartFor(weekStart) : null;
-    const targetWeek = requestedWeek ?? (await pool.query("SELECT date_trunc('week', CURRENT_DATE)::date AS week_start")).rows[0].week_start;
-    const exactWeek = await pool.query(`SELECT id, week_start, status, published_at FROM roster_weeks WHERE week_start = $1::date LIMIT 1`, [targetWeek]);
+    const targetWeek = requestedWeek ?? (await telstraPool.query("SELECT date_trunc('week', CURRENT_DATE)::date AS week_start")).rows[0].week_start;
+    const exactWeek = await telstraPool.query(`SELECT id, week_start, status, published_at FROM roster_weeks WHERE week_start = $1::date LIMIT 1`, [targetWeek]);
     const week = exactWeek.rows[0] && (user.role === "admin" || exactWeek.rows[0].status === "published")
       ? exactWeek
-      : await pool.query(`SELECT id, week_start, status, published_at FROM roster_weeks WHERE week_start <= $1::date AND status = 'published' ORDER BY week_start DESC LIMIT 1`, [targetWeek]);
+      : await telstraPool.query(`SELECT id, week_start, status, published_at FROM roster_weeks WHERE week_start <= $1::date AND status = 'published' ORDER BY week_start DESC LIMIT 1`, [targetWeek]);
     const rosterWeek = week.rows[0];
-    const staff = await pool.query(
+    const staff = await telstraPool.query(
       "SELECT id, name, store FROM staff_users WHERE is_active = TRUE AND role = 'sales' ORDER BY name",
     );
     if (!rosterWeek)
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
         shifts: [],
       });
     const source = user.role === "admin" && rosterWeek.week_start === targetWeek ? "roster_week_shifts" : "published_roster_week_shifts";
-    const shifts = await pool.query(
+    const shifts = await telstraPool.query(
       `SELECT staff_user_id, ($2::date + (shift_date - $3::date))::date AS shift_date, shift_label FROM ${source}
        WHERE roster_week_id = $1 ORDER BY shift_date, staff_user_id`,
       [rosterWeek.id, targetWeek, rosterWeek.week_start],
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
           { message: "Choose a staff member and store." },
           { status: 400 },
         );
-      await pool.query(
+      await telstraPool.query(
         "UPDATE staff_users SET store = $1 WHERE id = $2 AND is_active = TRUE AND role = 'sales'",
         [body.store.trim(), body.staffUserId],
       );
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
           { message: "The shift date must be inside the selected Monday–Sunday roster week." },
           { status: 400 },
         );
-      const client = await pool.connect();
+      const client = await telstraPool.connect();
       try {
         await client.query("BEGIN");
         const created = await client.query(`INSERT INTO roster_weeks (week_start, status) VALUES ($1, 'draft') ON CONFLICT (week_start) DO NOTHING RETURNING id`, [canonicalWeekStart]);
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       const canonicalWeekStart = weekStartFor(body.weekStart);
-      const client = await pool.connect();
+      const client = await telstraPool.connect();
       let week;
       try {
         await client.query("BEGIN");

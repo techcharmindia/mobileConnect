@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { posPool } from "@/lib/db";
 
 async function ensureMiscTable() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS miscellaneous_items (
+  await posPool.query(`CREATE TABLE IF NOT EXISTS miscellaneous_items (
     id SERIAL PRIMARY KEY,
     type VARCHAR(100) NOT NULL DEFAULT 'Miscellaneous',
     name VARCHAR(180) NOT NULL,
@@ -22,13 +22,13 @@ async function ensureMiscTable() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
 
-  await pool.query(`
+  await posPool.query(`
     ALTER TABLE miscellaneous_items
       ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0 CHECK (percentage >= 0),
       ADD COLUMN IF NOT EXISTS percentage_calc VARCHAR(30) NOT NULL DEFAULT 'Before Tax'
   `);
 
-  await pool.query(`
+  await posPool.query(`
     CREATE OR REPLACE FUNCTION update_timestamp()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -38,11 +38,11 @@ async function ensureMiscTable() {
     $$ LANGUAGE plpgsql
   `);
 
-  await pool.query(
+  await posPool.query(
     `DROP TRIGGER IF EXISTS set_timestamp_misc ON miscellaneous_items`,
   );
 
-  await pool.query(`
+  await posPool.query(`
     CREATE TRIGGER set_timestamp_misc
     BEFORE UPDATE ON miscellaneous_items
     FOR EACH ROW
@@ -119,8 +119,8 @@ export async function GET(request: Request) {
     `;
 
     const [count, rows] = await Promise.all([
-      pool.query(countQuery, values),
-      pool.query(rowsQuery, values),
+      posPool.query(countQuery, values),
+      posPool.query(rowsQuery, values),
     ]);
 
     return NextResponse.json({
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
 
-    const result = await pool.query(
+    const result = await posPool.query(
       `INSERT INTO miscellaneous_items
         (type, name, description, is_barcode, commission, on_pos,
          retail_price, cost_price, tax_class, tax_inclusive, image,
@@ -278,7 +278,7 @@ export async function PATCH(request: Request) {
 
     values.push(id);
 
-    const result = await pool.query(
+    const result = await posPool.query(
       `UPDATE miscellaneous_items SET ${setClauses.join(", ")} WHERE id = $${i} RETURNING *`,
       values,
     );
@@ -307,7 +307,7 @@ export async function DELETE(request: Request) {
     if (!id)
       return NextResponse.json({ message: "ID required" }, { status: 400 });
 
-    const result = await pool.query(
+    const result = await posPool.query(
       `DELETE FROM miscellaneous_items WHERE id = $1 RETURNING id`,
       [id],
     );

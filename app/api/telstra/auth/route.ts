@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { telstraPool } from "@/lib/db";
 import { createSessionToken, sessionCookie } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const result = await pool.query(
+    const result = await telstraPool.query(
       "SELECT id, name, role, store, pin FROM staff_users WHERE LOWER(name) = LOWER($1) AND is_active = TRUE LIMIT 1",
       [name.trim()],
     );
