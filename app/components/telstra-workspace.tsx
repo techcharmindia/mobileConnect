@@ -87,6 +87,7 @@ export default function TelstraWorkspace() {
   }, [tab]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [stock, setStock] = useState<Stock[]>([]);
+  const [productOptions, setProductOptions] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   async function load() {
@@ -109,6 +110,31 @@ export default function TelstraWorkspace() {
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadProducts() {
+      try {
+        const response = await fetch("/api/pos/products?sortBy=name&sortDir=asc");
+        if (!response.ok) throw new Error("Could not load products");
+        const data = await response.json();
+        if (active) {
+          setProductOptions(
+            (data.products || [])
+              .map((product: { name?: string }) => product.name)
+              .filter(Boolean),
+          );
+        }
+      } catch {
+        if (active) setProductOptions([]);
+      }
+    }
+
+    void loadProducts();
+    return () => {
+      active = false;
+    };
   }, []);
   const todays = sales.filter((s) => s.sale_date === today());
   const mine = sales.filter((s) => s.staff === user.name);
@@ -272,7 +298,7 @@ export default function TelstraWorkspace() {
             <>
               <Board data={ranking} user={user} />
               <div className="today-workspace">
-                <Form user={user} submit={submit} />
+                <Form user={user} submit={submit} products={productOptions} />
                 <section className="sales-card">
                   <h1>Today’s sales</h1>
                   <p>Live sales across all staff today</p>
@@ -449,9 +475,11 @@ function Board({
 function Form({
   user,
   submit,
+  products,
 }: {
   user: User;
   submit: (e: FormEvent<HTMLFormElement>) => void;
+  products: string[];
 }) {
   return (
     <form className="sale-card" onSubmit={submit}>
@@ -503,10 +531,11 @@ function Form({
             <option value="" disabled>
               — Select product —
             </option>
-            <option>NBN Premium</option>
-            <option>5G Internet</option>
-            <option>Sim Only Plan</option>
-            <option>DPC Device</option>
+            {products.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
         </label>
         <label>

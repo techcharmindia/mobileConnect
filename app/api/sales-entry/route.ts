@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { telstraPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 
 export async function POST(req: Request) {
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
 
     let result;
     try {
-      result = await pool.query(query, values);
+      result = await telstraPool.query(query, values);
     } catch (error: unknown) {
       // Existing installations may have the original table before the new
       // Telstra migration. Keep their POS sales flow working until schema.sql
@@ -79,14 +79,14 @@ export async function POST(req: Request) {
       try {
         // Databases that already have GP/order columns but not the newer
         // consent and stock columns must still retain the sale's GP value.
-        result = await pool.query(
+        result = await telstraPool.query(
           `INSERT INTO sales_entry (sale_date, channel, customer_name, cac, contact_number, email, category, store_location, staff, notes, status, order_number, gp)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
           values.slice(0, 13),
         );
       } catch (legacyError: unknown) {
         if (!(legacyError instanceof Error) || !/(order_number|gp)/.test(legacyError.message)) throw legacyError;
-        result = await pool.query(
+        result = await telstraPool.query(
           `INSERT INTO sales_entry (sale_date, channel, customer_name, cac, contact_number, email, category, store_location, staff, notes, status)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
           values.slice(0, 11),

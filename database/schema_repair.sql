@@ -1,0 +1,4 @@
+-- MobileConnectOS Repair database schema
+-- Run this file against the database configured as DB_REPAIR_NAME.
+-- Placeholder only: add the repair workflow tables here when the repair
+-- module is built (e.g. repair tickets, device info, status tracking).

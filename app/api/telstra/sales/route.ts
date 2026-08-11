@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { telstraPool } from "@/lib/db";
 
 export async function GET() {
   try {
-    const result = await pool.query(
+    const result = await telstraPool.query(
       "SELECT * FROM sales_entry ORDER BY sale_date DESC, id DESC LIMIT 250",
     );
     return NextResponse.json({ sales: result.rows });
@@ -32,7 +32,7 @@ export async function PATCH(request: Request) {
         { status: 400 },
       );
     }
-    const result = await pool.query(
+    const result = await telstraPool.query(
       "UPDATE sales_entry SET status = $1 WHERE id = $2 RETURNING *",
       [status, id],
     );

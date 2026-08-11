@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import { posPool } from "@/lib/db";
 
 async function ensureProductsTable() {
-  await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+  await posPool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
 
-  await pool.query(`CREATE TABLE IF NOT EXISTS pos_products (
+  await posPool.query(`CREATE TABLE IF NOT EXISTS pos_products (
     id SERIAL PRIMARY KEY,
     name VARCHAR(180) NOT NULL,
     sku VARCHAR(80) NOT NULL UNIQUE,
@@ -29,7 +29,7 @@ async function ensureProductsTable() {
   )`);
 
   // Backfill columns for older tables + new "Add New Item" fields
-  await pool.query(`
+  await posPool.query(`
     ALTER TABLE pos_products
       ADD COLUMN IF NOT EXISTS image_url TEXT,
       ADD COLUMN IF NOT EXISTS stock_warning INTEGER NOT NULL DEFAULT 0,
@@ -48,7 +48,7 @@ async function ensureProductsTable() {
       ADD COLUMN IF NOT EXISTS internal_notes TEXT
   `);
 
-  await pool.query(`
+  await posPool.query(`
     CREATE OR REPLACE FUNCTION update_timestamp()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -58,9 +58,9 @@ async function ensureProductsTable() {
     $$ LANGUAGE plpgsql
   `);
 
-  await pool.query(`DROP TRIGGER IF EXISTS set_timestamp ON pos_products`);
+  await posPool.query(`DROP TRIGGER IF EXISTS set_timestamp ON pos_products`);
 
-  await pool.query(`
+  await posPool.query(`
     CREATE TRIGGER set_timestamp
     BEFORE UPDATE ON pos_products
     FOR EACH ROW
@@ -188,8 +188,8 @@ export async function GET(request: Request) {
     `;
 
     const [products, totals] = await Promise.all([
-      pool.query(productsQuery, values),
-      pool.query(totalsQuery, values),
+      posPool.query(productsQuery, values),
+      posPool.query(totalsQuery, values),
     ]);
 
     return NextResponse.json({
@@ -268,7 +268,7 @@ export async function POST(request: Request) {
         ? true
         : body.taxInclusive === true || body.taxInclusive === "true";
 
-    const result = await pool.query(
+    const result = await posPool.query(
       `INSERT INTO pos_products
         (name, sku, upc, category, brand, model, imei, serial, supplier,
          valuation_method, condition, image_url, short_description,
@@ -390,7 +390,7 @@ export async function PATCH(request: Request) {
 
     values.push(id);
 
-    const result = await pool.query(
+    const result = await posPool.query(
       `UPDATE pos_products SET ${setClauses.join(", ")} WHERE id = $${i} RETURNING *`,
       values,
     );
@@ -424,7 +424,7 @@ export async function DELETE(request: Request) {
     if (!id)
       return NextResponse.json({ message: "ID required" }, { status: 400 });
 
-    const result = await pool.query(
+    const result = await posPool.query(
       `DELETE FROM pos_products WHERE id = $1 RETURNING id`,
       [id],
     );
