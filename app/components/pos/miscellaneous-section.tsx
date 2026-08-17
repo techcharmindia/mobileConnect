@@ -378,20 +378,6 @@ export default function MiscellaneousSection() {
           <p className="pos-title-sub">Track non-catalogue items sold through the register.</p>
         </div>
         <div className="pos-manage-actions">
-          <button
-            type="button"
-            className="pos-outline-btn"
-            onClick={() => {
-              if (filterPinned) {
-                setFilterPinned(false);
-                setFilterOpen(true);
-              } else {
-                setFilterOpen((o) => !o);
-              }
-            }}
-          >
-            <span aria-hidden>🔍</span> New Filter
-          </button>
           {!filterPinned && filterOpen && (
             <button
               type="button"
@@ -404,7 +390,7 @@ export default function MiscellaneousSection() {
             </button>
           )}
 
-          <div className="misc-menu-anchor">
+          {/* <div className="misc-menu-anchor">
             <button
               type="button"
               className="pos-outline-btn"
@@ -426,10 +412,10 @@ export default function MiscellaneousSection() {
                 </button>
               </div>
             )}
-          </div>
+          </div> */}
 
           <Link href="/pos/miscellaneous/new" className="pos-create">
-            ＋ Create Misc Item
+            Create Misc Item
           </Link>
         </div>
       </div>
